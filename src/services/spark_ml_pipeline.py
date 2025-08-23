@@ -167,10 +167,11 @@ def get_f1_score(predictions, model):
     return result.first()["F1"]
 
 
-def ml_model(df):
+def ml_model(df, cluster_list=[2, 5, 10]):
     """
     Trains K-Means ml model for anomaly detection via pyspark
     :param df: preprocessed spark df with credit card data
+    :param cluster_list: list of cluster numbers
     :return: results of ml training
     """
 
@@ -186,7 +187,6 @@ def ml_model(df):
     # create a list of potential K values and use the average results from 5-Fold Cross Validation to determine the
     # best K value for our model
     folds = 5
-    cluster_list = [2, 5, 10]
     results = {}
 
     for cluster in cluster_list:
@@ -249,7 +249,7 @@ def ml_model(df):
     return get_f1_score(predictions, model)
 
 
-def main(data):
+def run(data, cluster_list):
     """
     Runs application. Also times every major step of application
     """
@@ -291,7 +291,7 @@ def main(data):
     # F1 score from best model to show how it performed.
     start = time.time()
 
-    results = ml_model(scaled_df)
+    results = ml_model(scaled_df, cluster_list)
     print("Best F1 Score:", results)
 
     end = time.time()
@@ -308,4 +308,4 @@ def main(data):
 
 
 if __name__ == "__main__":
-    main()
+    run()
