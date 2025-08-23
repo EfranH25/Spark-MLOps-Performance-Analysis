@@ -5,7 +5,9 @@ description = "Add your description here"
 requires-python = ">=3.13"
 dependencies = [
     "black>=25.1.0",
+    "findspark>=2.0.1",
     "kagglehub>=0.3.12",
+    "notebook>=7.4.5",
     "numpy>=2.3.2",
     "pyspark>=4.0.0",
     "ruff>=0.12.10",
