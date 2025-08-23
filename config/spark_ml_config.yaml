@@ -1,0 +1,8 @@
+
+---
+credit_card_fraud:
+  enable: true
+  data_handle: "mlg-ulb/creditcardfraud"
+  data_folder: "creditcardfraud"
+  job_config:
+    cluster_list: [2] #[2, 5, 10]
