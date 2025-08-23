@@ -1,7 +1,3 @@
-"""
-Milestone goal for cs 532. Run this application and record the following in csv file for reporting
-"""
-
 import time
 import statistics
 
@@ -14,6 +10,10 @@ from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.clustering import KMeans
 from pyspark.sql.functions import udf
 from pyspark.sql.types import FloatType
+
+import logging
+
+logger = logging.getLogger("app")
 
 # setting random seed for notebook reproducibility
 RND_SEED = 23
@@ -175,7 +175,7 @@ def ml_model(df, cluster_list=[2, 5, 10]):
     :return: results of ml training
     """
 
-    print("starting ml process")
+    logger.info("Starting ml process")
 
     # We split our data into training and test set. We will train our model on the train set to pick our best model.
     # Then we see how our best model performs by evaluating it on our test set.
@@ -222,10 +222,10 @@ def ml_model(df, cluster_list=[2, 5, 10]):
         entry["times"] = time_list
         entry["mean_time"] = statistics.mean(time_list)
         entry["model"] = kmeans
-        print(cluster, entry)
+        logger.info(f"Cluster {cluster} \n Entry: {entry}")
         results[cluster] = entry
 
-    print(results)
+    logger.info(results)
 
     best_f1 = -1
     best_model = None
@@ -242,8 +242,8 @@ def ml_model(df, cluster_list=[2, 5, 10]):
     start = time.time()
     predictions = model.transform(test_data)
     end = time.time()
-    print(
-        "========= Execution to for predicting test data :", (end - start) * 10**3, "ms"
+    logger.info(
+        f"========= Execution to for predicting test data: {(end - start) * 10**3} ms"
     )
 
     return get_f1_score(predictions, model)
@@ -266,10 +266,8 @@ def run(data, cluster_list):
     spark, credit_df = setup(fraud_data)
 
     end = time.time()
-    print(
-        "========= Execution to for setup of spark and loading data :",
-        (end - start) * 10**3,
-        "ms",
+    logger.info(
+        f"========= Execution to for setup of spark and loading data: {(end - start) * 10**3} ms"
     )
 
     # Step 2. Preprocessing data
@@ -281,8 +279,8 @@ def run(data, cluster_list):
     scaled_df = preprocess(credit_df)
 
     end = time.time()
-    print(
-        "========= Execution to for preprocessing data :", (end - start) * 10**3, "ms"
+    logger.info(
+        f"========= Execution to for preprocessing data: {(end - start) * 10**3}ms"
     )
 
     # Step 3: Building ML Model
@@ -292,20 +290,20 @@ def run(data, cluster_list):
     start = time.time()
 
     results = ml_model(scaled_df, cluster_list)
-    print("Best F1 Score:", results)
+    logger.info(f"Best F1 Score: {results}")
 
     end = time.time()
-    print("========= Execution to for training ML model :", (end - start) * 10**3, "ms")
+    logger.info(
+        f"========= Execution to for training ML model: {(end - start) * 10**3}ms"
+    )
 
     spark.stop()
 
     end = time.time()
-    print(
-        "========= Final execution to for ML process :",
-        (end - pipeline_start) * 10**3,
-        "ms",
+    logger.info(
+        f"========= Final execution to for ML process: {(end - pipeline_start) * 10**3}ms"
     )
 
 
-if __name__ == "__main__":
-    run()
+# if __name__ == "__main__":
+#     run()

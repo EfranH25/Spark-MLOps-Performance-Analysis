@@ -1,13 +1,30 @@
+import logging
+
 from services import utils
 from services import spark_ml_pipeline
 
 import yaml
 
-if __name__ == "__main__":
-    print("starting")
 
+def setup_logger(name: str, level: str = "DEBUG") -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(level.upper())
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(name)s: %(message)s")
+    handler.setFormatter(formatter)
+    if not logger.hasHandlers():
+        logger.addHandler(handler)
+
+    logger.info(f"Logging level: {logger.level}")
+    return logger
+
+
+def main():
     with open("../config/spark_ml_config.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
+
+    logger = setup_logger("app", config["log_level"])
+    logger.info("Start")
 
     if "credit_card_fraud" in config and config["credit_card_fraud"]["enable"]:
         data_output_folder = utils.get_data(
@@ -16,10 +33,14 @@ if __name__ == "__main__":
         )
 
         if data_output_folder:
-            print("START")
+            logger.info("Starting credit card fraud clustering model")
             spark_ml_pipeline.run(
                 data_output_folder, **config["credit_card_fraud"]["job_config"]
             )
-            print("FINISHED")
+            logger.info("finished credit card fraud clustering model")
     else:
-        print("skipping credit card fraud detection.")
+        logger.info("Skipping credit card fraud detection.")
+
+
+if __name__ == "__main__":
+    main()

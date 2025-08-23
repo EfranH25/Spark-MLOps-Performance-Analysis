@@ -1,5 +1,6 @@
 
 ---
+log_level: "INFO"
 credit_card_fraud:
   enable: true
   data_handle: "mlg-ulb/creditcardfraud"
