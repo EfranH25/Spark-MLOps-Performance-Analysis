@@ -1,44 +1,19 @@
 import kagglehub
 from os import path, mkdir, rename, listdir
-from shutil import rmtree
 
 
-DATA_OPTIONS = {"creditcardfraud": "mlg-ulb/creditcardfraud"}
-
-
-def get_data(
-    data_name: str,
-):
+def get_data(data_handle: str, data_folder: str) -> str | None:
     if not path.exists("data"):
         mkdir("data")
 
-    if data_name in DATA_OPTIONS:
-        if path.exists(path.join("data", data_name)):
-            print(f"{data_name} already exists, skipping.")
-            return
-        data_path = kagglehub.dataset_download(
-            handle=DATA_OPTIONS[data_name]
-        )  # TODO: for some reason kaggle download doesn't save to path so have to manually move
-        rename(data_path, path.join("data", data_name))
-        print(f"Dataset {data_name} downloaded.")
+    data_output_folder = path.join("data", data_folder)
+    if path.exists(data_output_folder) and listdir(data_output_folder):
+        print(f"Files in output path '{data_output_folder}':\n{listdir(data_output_folder)}\n"
+              f"Please clean if unintended.")
+        return None
     else:
-        print(
-            f"Dataset {data_name} not found in data options {list(DATA_OPTIONS.keys())}"
-        )
-
-
-def cleanup_data(data_name: str | None = None, clean_all: bool = False):
-    if clean_all:
-        print("Remove all datasets in 'data'")
-        folder_list = listdir("data")
-        for folder in folder_list:
-            rmtree(path.join("data", folder))
-        print("Complete")
-    elif data_name:
-        if data_name in DATA_OPTIONS:
-            rmtree(path.join("data", data_name))
-            print(f"Dataset {data_name} removed.")
-        else:
-            print(
-                f"Dataset {data_name} not found in data options {list(DATA_OPTIONS.keys())}. Nothing to clean."
-            )
+        # TODO: for some reason kaggle download doesn't save to path so have to manually move
+        data_path = kagglehub.dataset_download(handle=data_handle)
+        rename(data_path, data_output_folder)
+        print(f"Dataset {data_handle} downloaded to {data_output_folder}")
+        return data_output_folder
