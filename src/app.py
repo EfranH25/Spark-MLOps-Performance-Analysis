@@ -1,5 +1,7 @@
+import json
 import logging
 from os import path, listdir
+from datetime import datetime
 
 from services import utils
 from services import spark_ml_pipeline
@@ -38,19 +40,35 @@ def main():
                 data_folder=config["credit_card_fraud"]["data_folder"],
             )
         else:
-            if (path.exists(path.join('data', config["credit_card_fraud"]["data_folder"]))
-                    and listdir(path.join('data', config["credit_card_fraud"]["data_folder"]))):
+            if path.exists(
+                path.join("data", config["credit_card_fraud"]["data_folder"])
+            ) and listdir(
+                path.join("data", config["credit_card_fraud"]["data_folder"])
+            ):
                 logger.info("Data folder with data already exists. Using data.")
-                data_output_folder = path.join('data', config["credit_card_fraud"]["data_folder"])
+                data_output_folder = path.join(
+                    "data", config["credit_card_fraud"]["data_folder"]
+                )
             else:
                 raise f"'credit_card_fraud' called but no {config["credit_card_fraud"]["data_folder"]} folder or data found."
         if data_output_folder:
             logger.info("Starting credit card fraud clustering model")
 
             # TODO: initialize Hadoop and store data there. Run pipeline twice and compare results
-            spark_ml_pipeline.run(
+            metrics = spark_ml_pipeline.run(
                 data_output_folder, **config["credit_card_fraud"]["job_config"]
             )
+
+            with open(
+                path.join(
+                    "metrics",
+                    datetime.now().strftime("%H_%M_%S_")
+                    + "credit_card_fraud_metrics.json",
+                ),
+                "w",
+            ) as metrics_file:
+                json.dump(metrics, metrics_file)
+
             logger.info("finished credit card fraud clustering model")
     else:
         logger.info("Skipping credit card fraud detection.")

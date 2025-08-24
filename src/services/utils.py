@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger("app")
 
+
 def setup_folders():
     if not path.exists("data"):
         mkdir("data")

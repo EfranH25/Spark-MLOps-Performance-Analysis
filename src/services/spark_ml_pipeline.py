@@ -1,10 +1,12 @@
 import time
 import statistics
+from typing import List, Dict
 
 # import math
 
 
 import numpy as np
+from pyspark.sql.dataframe import DataFrame
 from pyspark.sql import SparkSession, functions
 from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.clustering import KMeans
@@ -21,18 +23,20 @@ np.random.seed = RND_SEED
 np.random.set_state = RND_SEED
 
 
-def setup(path):
+def setup(path: str) -> (SparkSession, DataFrame):
     """
     Starts up spark session and loads fraud data into dataframe
     :param path: absolute path to fraud data
     :return: spark session and fraud data loaded in spark
     """
-    spark = SparkSession.builder.appName("CreditFraudDetector").getOrCreate()
-    df = spark.read.csv(path, header=True, inferSchema=True)
+    spark: SparkSession = SparkSession.builder.appName(
+        "CreditFraudDetector"
+    ).getOrCreate()
+    df: DataFrame = spark.read.csv(path, header=True, inferSchema=True)
     return spark, df
 
 
-def preprocess(df):
+def preprocess(df: DataFrame) -> DataFrame:
     """
     Applies preprocessing step for ML pipeline
     :param df: spark df with credit card data loaded
@@ -78,6 +82,7 @@ def preprocess(df):
     assembled_df = assembler.transform(df)
     # assembled_df.show(10, truncate=False)
 
+    # TODO: add additional preprocessing steps to improve performance
     # Standard scaler normalizes features to a common scale. Normalization puts values into similar scale which can
     # help ML training because data points are more like for like.
     standard_scaler = StandardScaler(inputCol="features", outputCol="features_scaled")
@@ -167,18 +172,21 @@ def get_f1_score(predictions, model):
     return result.first()["F1"]
 
 
-def ml_model(df, cluster_list=[2, 5, 10]):
+def ml_model(metrics: Dict, df: DataFrame, cluster_list: List[int], folds: int = 5):
     """
     Trains K-Means ml model for anomaly detection via pyspark
+    :param metrics: Dictionary that contains metrics
     :param df: preprocessed spark df with credit card data
     :param cluster_list: list of cluster numbers
+    :param folds: number of folds for cross validation
     :return: results of ml training
     """
 
     logger.info("Starting ml process")
-
     # We split our data into training and test set. We will train our model on the train set to pick our best model.
     # Then we see how our best model performs by evaluating it on our test set.
+    # TODO: add functionality for stratified splits
+    # https://stackoverflow.com/questions/47637760/stratified-sampling-with-pyspark
     train_data, test_data = df.randomSplit([0.8, 0.2], seed=RND_SEED)
 
     # 5-Fold Cross Validation
@@ -186,8 +194,8 @@ def ml_model(df, cluster_list=[2, 5, 10]):
     # determine the number of clusters to group our data. We do not know which K value is best. So we will
     # create a list of potential K values and use the average results from 5-Fold Cross Validation to determine the
     # best K value for our model
-    folds = 5
     results = {}
+    results_metrics = {}
 
     for cluster in cluster_list:
         entry = {}
@@ -206,6 +214,7 @@ def ml_model(df, cluster_list=[2, 5, 10]):
         # the 80 set and is scored on the 20 set. F1 score is used to score model accuracy. The F1 score for each
         # fold is stored for each K. The highest average F1 score determines the best K.
         for _ in range(folds):
+            # TODO: add functionality for stratified splits
             fold_train_data, fold_test_data = train_data.randomSplit([0.8, 0.2])
             model = kmeans.fit(fold_train_data)
             predictions = model.transform(fold_test_data)
@@ -213,7 +222,6 @@ def ml_model(df, cluster_list=[2, 5, 10]):
             # Calculate F1 Score
             f1_score = get_f1_score(predictions, model)
             f1_score_list.append(f1_score)
-
             time_list.append(time.time() - cluster_time)
 
         # Track results per cluster.
@@ -221,11 +229,14 @@ def ml_model(df, cluster_list=[2, 5, 10]):
         entry["mean_f1_score"] = statistics.mean(f1_score_list)
         entry["times"] = time_list
         entry["mean_time"] = statistics.mean(time_list)
-        entry["model"] = kmeans
         logger.info(f"Cluster {cluster} \n Entry: {entry}")
+        results_metrics[cluster] = entry.copy()
+        entry["model"] = kmeans
         results[cluster] = entry
 
-    logger.info(results)
+    # logger.info(results)
+
+    metrics["training_results"] = results_metrics
 
     best_f1 = -1
     best_model = None
@@ -237,16 +248,19 @@ def ml_model(df, cluster_list=[2, 5, 10]):
             best_model = results[cluster]["model"]
 
     model = best_model.fit(train_data)
+    model.save("spark_ml_pipeline.model")
 
     # Performs prediction with the best model on the test data. Returns F1 score
     start = time.time()
     predictions = model.transform(test_data)
     end = time.time()
-    logger.info(
-        f"========= Execution to for predicting test data: {(end - start) * 10**3} ms"
-    )
 
-    return get_f1_score(predictions, model)
+    metrics["best_model_pred_time"] = (end - start) * 10**3
+    logger.info(f"time for predicting test data: {metrics['best_model_pred_time']} ms")
+
+    best_f1 = get_f1_score(predictions, model)
+    metrics["best_f1_score"] = best_f1
+    return best_f1, metrics
 
 
 def run(data, cluster_list):
@@ -254,6 +268,7 @@ def run(data, cluster_list):
     Runs application. Also times every major step of application
     """
 
+    metrics = {}
     pipeline_start = time.time()
 
     # Step 1: Loading data
@@ -264,10 +279,11 @@ def run(data, cluster_list):
 
     start = time.time()
     spark, credit_df = setup(fraud_data)
-
     end = time.time()
+    metrics["spark_setup_data_lost"] = (end - start) * 10**3
+
     logger.info(
-        f"========= Execution to for setup of spark and loading data: {(end - start) * 10**3} ms"
+        f"Execution time for setup of spark and loading data: {metrics['spark_setup_data_lost']} ms"
     )
 
     # Step 2. Preprocessing data
@@ -275,35 +291,28 @@ def run(data, cluster_list):
     # and prediction. For our preprocessing step, we put the training and prediction column into a dense vector and
     # then normalize our data.
     start = time.time()
-
     scaled_df = preprocess(credit_df)
-
     end = time.time()
-    logger.info(
-        f"========= Execution to for preprocessing data: {(end - start) * 10**3}ms"
-    )
+    metrics["preprocessing"] = (end - start) * 10**3
+    logger.info(f"Execution time for preprocessing data: {metrics['preprocessing']}ms")
 
     # Step 3: Building ML Model
     # Trains K-Means model with credit card transaction data. Uses 5-Folds Cross Validation to determine
     # best K for fraud detection. Selects best model based on F1 score. Runs best model on test set and returns
     # F1 score from best model to show how it performed.
     start = time.time()
-
-    results = ml_model(scaled_df, cluster_list)
+    results, metrics = ml_model(metrics, scaled_df, cluster_list)
     logger.info(f"Best F1 Score: {results}")
-
     end = time.time()
-    logger.info(
-        f"========= Execution to for training ML model: {(end - start) * 10**3}ms"
-    )
+    metrics["ml_training"] = (end - start) * 10**3
+
+    logger.info(f"Execution time for training ML model: {metrics['ml_training']}ms")
 
     spark.stop()
-
     end = time.time()
-    logger.info(
-        f"========= Final execution to for ML process: {(end - pipeline_start) * 10**3}ms"
-    )
 
+    metrics["pipeline_runtime"] = (end - pipeline_start) * 10**3
 
-# if __name__ == "__main__":
-#     run()
+    logger.info(f"Final execution time for ML process: {metrics["pipeline_runtime"]}ms")
+
+    return metrics
