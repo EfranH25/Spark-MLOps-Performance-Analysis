@@ -80,6 +80,7 @@ def main():
 # TODO: Containerize training process to gather metrics
     # Update README with report regarding how system effects metrics
 # TODO: Deploy model and add FASTAPI to interact with models and pass in results. Maybe frontend UI
+# TODO: [Optional] Fine Tune models further
 
 
 if __name__ == "__main__":
