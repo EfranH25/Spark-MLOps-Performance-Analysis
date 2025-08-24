@@ -74,5 +74,13 @@ def main():
         logger.info("Skipping credit card fraud detection.")
 
 
+# TODO: try other spark ML models
+    # - Regression
+    # - Decision Tree
+# TODO: Containerize training process to gather metrics
+    # Update README with report regarding how system effects metrics
+# TODO: Deploy model and add FASTAPI to interact with models and pass in results. Maybe frontend UI
+
+
 if __name__ == "__main__":
     main()
