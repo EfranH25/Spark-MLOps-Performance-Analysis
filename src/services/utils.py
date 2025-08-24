@@ -5,11 +5,18 @@ import logging
 
 logger = logging.getLogger("app")
 
-
-def get_data(data_handle: str, data_folder: str) -> str | None:
+def setup_folders():
     if not path.exists("data"):
         mkdir("data")
 
+    if not path.exists("metrics"):
+        mkdir("metrics")
+
+    if not path.exists("models"):
+        mkdir("models")
+
+
+def get_data(data_handle: str, data_folder: str) -> str | None:
     data_output_folder = path.join("data", data_folder)
     if path.exists(data_output_folder) and listdir(data_output_folder):
         logger.info(
