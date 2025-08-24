@@ -74,6 +74,10 @@ def main():
         logger.info("Skipping credit card fraud detection.")
 
 
+# TODO: add metrics regarding memory usage
+    # Peak CPU Usage
+    # Peak Memory Usage
+# TODO: add hadoop
 # TODO: try other spark ML models
     # - Regression
     # - Decision Tree
