@@ -1,5 +1,7 @@
 import time
 import statistics
+from datetime import datetime
+from os import path
 from typing import List, Dict
 
 # import math
@@ -23,16 +25,16 @@ np.random.seed = RND_SEED
 np.random.set_state = RND_SEED
 
 
-def setup(path: str) -> (SparkSession, DataFrame):
+def setup(data_path: str) -> (SparkSession, DataFrame):
     """
     Starts up spark session and loads fraud data into dataframe
-    :param path: absolute path to fraud data
+    :param data_path: absolute path to fraud data
     :return: spark session and fraud data loaded in spark
     """
     spark: SparkSession = SparkSession.builder.appName(
         "CreditFraudDetector"
     ).getOrCreate()
-    df: DataFrame = spark.read.csv(path, header=True, inferSchema=True)
+    df: DataFrame = spark.read.csv(data_path, header=True, inferSchema=True)
     return spark, df
 
 
@@ -90,6 +92,21 @@ def preprocess(df: DataFrame) -> DataFrame:
     # scaled_df.select("features", "features_scaled").show(10, truncate=False)
 
     return scaled_df
+
+
+def get_value_counts(df, col="Class", show_results=False, msg="Results for Class"):
+    """
+    Returns value count of column for df
+    :param df: Dataframe with fraud data
+    :param col: Column name
+    :param show_results: Print results else results logged in DEBUG level
+    :param msg: Small message to print out when show_results is True
+    :return:
+    """
+    value_counts_df = df.groupBy(col).count()
+    if show_results:
+        logger.info(msg)
+        logger.info(value_counts_df.show())
 
 
 def get_f1_score(predictions, model):
@@ -188,6 +205,12 @@ def ml_model(metrics: Dict, df: DataFrame, cluster_list: List[int], folds: int =
     # TODO: add functionality for stratified splits
     # https://stackoverflow.com/questions/47637760/stratified-sampling-with-pyspark
     train_data, test_data = df.randomSplit([0.8, 0.2], seed=RND_SEED)
+    get_value_counts(
+        train_data, show_results=False, msg="Train data 'Class' value count:"
+    )
+    get_value_counts(
+        test_data, show_results=False, msg="Train data 'Class' value count:"
+    )
 
     # 5-Fold Cross Validation
     # We use the K-Means ML model for our anomaly detection. The K-Means model takes in the variable K to
@@ -213,9 +236,21 @@ def ml_model(metrics: Dict, df: DataFrame, cluster_list: List[int], folds: int =
         # For each fold, a random 80/20 split of data is taken from the training set. The model clusters on
         # the 80 set and is scored on the 20 set. F1 score is used to score model accuracy. The F1 score for each
         # fold is stored for each K. The highest average F1 score determines the best K.
-        for _ in range(folds):
+        for f in range(folds):
             # TODO: add functionality for stratified splits
             fold_train_data, fold_test_data = train_data.randomSplit([0.8, 0.2])
+
+            get_value_counts(
+                train_data,
+                show_results=False,
+                msg=f"Cluster {cluster} - Fold {f}: Train data 'Class' value count:",
+            )
+            get_value_counts(
+                test_data,
+                show_results=False,
+                msg=f"Cluster {cluster} - Fold {f}: Train data 'Class' value count:",
+            )
+
             model = kmeans.fit(fold_train_data)
             predictions = model.transform(fold_test_data)
 
@@ -239,27 +274,36 @@ def ml_model(metrics: Dict, df: DataFrame, cluster_list: List[int], folds: int =
     metrics["training_results"] = results_metrics
 
     best_f1 = -1
+    model_train_time = 0
     best_model = None
 
     # Selects best model
     for cluster in results:
         if results[cluster]["mean_f1_score"] > best_f1:
             best_f1 = results[cluster]["mean_f1_score"]
+            model_train_time = results[cluster]["mean_time"]
             best_model = results[cluster]["model"]
 
     model = best_model.fit(train_data)
-    model.save("spark_ml_pipeline.model")
 
     # Performs prediction with the best model on the test data. Returns F1 score
     start = time.time()
     predictions = model.transform(test_data)
     end = time.time()
 
+    metrics["best_model_train_time"] = model_train_time
     metrics["best_model_pred_time"] = (end - start) * 10**3
     logger.info(f"time for predicting test data: {metrics['best_model_pred_time']} ms")
 
     best_f1 = get_f1_score(predictions, model)
     metrics["best_f1_score"] = best_f1
+
+    model.save(
+        path.join(
+            "models", datetime.now().strftime("%H_%M_%S_") + "credit_card_fraud_model"
+        )
+    )
+
     return best_f1, metrics
 
 
@@ -310,9 +354,6 @@ def run(data, cluster_list):
 
     spark.stop()
     end = time.time()
-
     metrics["pipeline_runtime"] = (end - pipeline_start) * 10**3
-
     logger.info(f"Final execution time for ML process: {metrics["pipeline_runtime"]}ms")
-
     return metrics

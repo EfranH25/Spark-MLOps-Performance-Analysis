@@ -1,6 +1,7 @@
 import json
 import logging
 from os import path, listdir
+
 from datetime import datetime
 
 from services import utils
@@ -50,14 +51,24 @@ def main():
                     "data", config["credit_card_fraud"]["data_folder"]
                 )
             else:
-                raise f"'credit_card_fraud' called but no {config["credit_card_fraud"]["data_folder"]} folder or data found."
+                raise f"'credit_card_fraud' called but no {config['credit_card_fraud']['data_folder']} folder or data found."
         if data_output_folder:
             logger.info("Starting credit card fraud clustering model")
 
-            # TODO: initialize Hadoop and store data there. Run pipeline twice and compare results
-            metrics = spark_ml_pipeline.run(
-                data_output_folder, **config["credit_card_fraud"]["job_config"]
-            )
+            monitor = utils.ResourceMonitor(interval=1.0)
+            monitor.start()
+            metrics = {}
+            try:
+                metrics = spark_ml_pipeline.run(
+                    data_output_folder, **config["credit_card_fraud"]["job_config"]
+                )
+            finally:
+                monitor.stop()
+                stats = monitor.get_stats()
+                print(f"Peak CPU: {stats['peak_cpu_percent']}%")
+                print(f"Peak Memory: {stats['peak_memory_mb']} MB")
+
+                metrics["resource_stats"] = stats
 
             with open(
                 path.join(
@@ -74,15 +85,12 @@ def main():
         logger.info("Skipping credit card fraud detection.")
 
 
-# TODO: add metrics regarding memory usage
-    # Peak CPU Usage
-    # Peak Memory Usage
 # TODO: add hadoop
 # TODO: try other spark ML models
-    # - Regression
-    # - Decision Tree
+# - Regression
+# - Decision Tree
 # TODO: Containerize training process to gather metrics
-    # Update README with report regarding how system effects metrics
+# Update README with report regarding how system effects metrics
 # TODO: Deploy model and add FASTAPI to interact with models and pass in results. Maybe frontend UI
 # TODO: [Optional] Fine Tune models further
 
