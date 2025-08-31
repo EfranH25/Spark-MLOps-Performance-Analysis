@@ -27,7 +27,7 @@ def main():
     with open("../config/spark_ml_config.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
 
-    logger = setup_logger("app", config["log_level"])
+    logger = setup_logger("ml_app", config["log_level"])
     logger.info("Start")
 
     utils.setup_folders()

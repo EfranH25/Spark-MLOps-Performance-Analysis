@@ -17,7 +17,7 @@ from pyspark.sql.types import FloatType
 
 import logging
 
-logger = logging.getLogger("app")
+logger = logging.getLogger("ml_app")
 
 # setting random seed for notebook reproducibility
 RND_SEED = 23

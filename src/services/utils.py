@@ -7,7 +7,7 @@ from os import path, mkdir, rename, listdir
 
 import logging
 
-logger = logging.getLogger("app")
+logger = logging.getLogger("ml_app")
 
 
 class ResourceMonitor:

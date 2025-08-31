@@ -4,7 +4,7 @@
 SOURCE_FOLDER := "src"
 
 run-app:
-	cd $(SOURCE_FOLDER) && python app.py
+	cd $(SOURCE_FOLDER) && python ml_app.py
 
 clean-data:
 	cd $(SOURCE_FOLDER) && rm -rf data/*
