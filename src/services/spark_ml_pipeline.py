@@ -25,7 +25,7 @@ np.random.seed = RND_SEED
 np.random.set_state = RND_SEED
 
 
-def setup(data_path: str) -> (SparkSession, DataFrame):
+def setup(data_path: str):
     """
     Starts up spark session and loads fraud data into dataframe
     :param data_path: absolute path to fraud data
@@ -46,6 +46,7 @@ def preprocess(df: DataFrame) -> DataFrame:
     """
 
     feature_cols = [
+        "Time",
         "V1",
         "V2",
         "V3",
@@ -79,7 +80,7 @@ def preprocess(df: DataFrame) -> DataFrame:
     ]
 
     # Move data to dense vector. This vectorization process transforms data into format that ML model is trained on.
-    # We select the relevant features we want to train our model on. In this case, thats all the columns minus time.
+    # We select the relevant features we want to train our model on.
     assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
     assembled_df = assembler.transform(df)
     # assembled_df.show(10, truncate=False)
@@ -300,7 +301,8 @@ def ml_model(metrics: Dict, df: DataFrame, cluster_list: List[int], folds: int =
 
     model.save(
         path.join(
-            "models", datetime.now().strftime("%H_%M_%S_") + "credit_card_fraud_model"
+            "models",
+            datetime.now().strftime("%d_%m_%Y_%H_%M_%S_") + "credit_card_fraud_model",
         )
     )
 

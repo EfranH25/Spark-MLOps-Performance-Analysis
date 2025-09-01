@@ -1,5 +1,6 @@
 from pyspark import SparkContext
 
+
 def test_spark_session():
     try:
         # import os
